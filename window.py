@@ -1,7 +1,9 @@
 import os
+import time
 import shutil
 import base64
 import pysftp
+from win10toast import ToastNotifier
 from tkinter import DISABLED, END, INSERT, NORMAL, filedialog, Button, Text, Frame, Tk
 
 def GuuFileSync():
@@ -13,6 +15,7 @@ def GuuFileSync():
     icondata= base64.b64decode(icon)
 
     folder_location = None
+    toaster = ToastNotifier()
 
     window_padX = 10
     window_padY = 20
@@ -57,7 +60,6 @@ def GuuFileSync():
             os.mkdir(f'{os.getcwd()}\\tmp\\')
         base = os.path.basename(destination)
         archive_from = os.path.dirname(source)
-        print(archive_from)
         archive_to = os.path.basename(source.strip(os.sep))
         shutil.make_archive(base, 'zip', archive_from, archive_to)
         shutil.move('%s.%s' % (base, 'zip'), destination)
@@ -67,3 +69,5 @@ def GuuFileSync():
     with pysftp.Connection('gudx.dev', username='groundedsaves', password='2xyWsgV2tat&iZj3') as sftp:
         with sftp.cd('/var/www/gudx.dev/downloads/Grounded/'):
             sftp.put(f'{os.getcwd()}\\tmp\\{os.path.basename(folder_location)}.zip')
+            toaster.show_toast("Guu File Sync", "Save has been uploaded.", icon_path=None, duration=10)
+            while toaster.notification_active(): time.sleep(0.1)
