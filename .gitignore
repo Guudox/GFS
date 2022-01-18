@@ -2,3 +2,4 @@
 /build/*
 /dist/*
 p.spec
+/tmp/*
