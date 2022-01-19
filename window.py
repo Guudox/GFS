@@ -1,8 +1,8 @@
 import os
-import time
 import shutil
 import base64
 import pysftp
+import threading
 from win10toast import ToastNotifier
 from tkinter import DISABLED, END, INSERT, NORMAL, filedialog, Button, Text, Frame, Tk
 
@@ -36,38 +36,60 @@ def GuuFileSync():
     load_save_location = Frame(window)
     load_save_location.pack()
 
-    def browsefunc(func, file=None):
+    upload_download_location = Frame(window)
+    upload_download_location.pack()
+
+    def browsefunc():
         nonlocal folder_location
-        func.config(state=NORMAL)
-        func.delete(1.0, END)
+        load_path_text.config(state=NORMAL)
+        load_path_text.delete(1.0, END)
         folder_location = filedialog.askdirectory()
-        func.insert(1.0, folder_location)
-        func.see(INSERT)
-        func.config(state=DISABLED)
+        load_path_text.insert(1.0, folder_location)
+        load_path_text.see(INSERT)
+        load_path_text.config(state=DISABLED)
+
+    def sftp_util(state):
+        with pysftp.Connection('gudx.dev', username='groundedsaves', password='2xyWsgV2tat&iZj3') as sftp:
+            if state == 'upload':
+                sftp.chdir('saves')
+                sftp.put(f'{os.getcwd()}\\tmp\\latest.zip')
+                sftp.chdir('backup')
+                sftp.put(f'{os.getcwd()}\\tmp\\{os.path.basename(folder_location)}.zip')
+                sftp.close()
+                toaster.show_toast("Guu File Sync", "Save has been uploaded.", icon_path=None, duration=10)
+            elif state == 'download':
+                file = sftp.get(f'{os.getcwd()}\\tmp\\{os.path.basename(folder_location)}.zip')
+                print(file)
+                toaster.show_toast("Guu File Sync", "Save file sync'd to local system.", icon_path=None, duration=10)
+                
+
+    def make_archive():
+        def inner_func():
+            destination = f'{os.getcwd()}\\tmp\\{os.path.basename(folder_location)}.zip'
+            if not os.path.isdir(f'{os.getcwd()}\\tmp'):
+                os.mkdir(f'{os.getcwd()}\\tmp\\')
+            base = os.path.basename(destination)
+            archive_from = os.path.dirname(folder_location)
+            archive_to = os.path.basename(folder_location.strip(os.sep))
+            shutil.make_archive(base, 'zip', archive_from, archive_to)
+            shutil.move('%s.%s' % (base, 'zip'), destination)
+            shutil.copy(destination, f'{os.getcwd()}/tmp/latest.zip')
+            sftp_util('upload')
+        threading.Thread(target=inner_func).start()
+        
 
     load_path_text = Text(load_save_location, wrap="none",height=1, width=30, state=DISABLED)
     load_path_text.grid(row=0, column=0, padx=window_padX, pady=window_padY)
-    browsefolderbutton = Button(load_save_location, text="Browse", command=lambda: browsefunc(load_path_text, 'dir'))
+    browsefolderbutton = Button(load_save_location, text="Browse", command=browsefunc)
     browsefolderbutton.grid(row=0, column=1, padx=window_padX, pady=window_padY)
-    
+
+    upload = Button(upload_download_location, text="Upload", command=make_archive)
+    upload.grid(row=1, column=0, padx=window_padX)
+
+    download = Button(upload_download_location, text="Download", command=browsefunc)
+    download.grid(row=1, column=1, padx=window_padX)
+
     window.resizable(False, False)
     window.mainloop()
 
     os.remove(tempFile)
-
-    def make_archive(source, destination):
-        if not os.path.isdir(f'{os.getcwd()}\\tmp'):
-            os.mkdir(f'{os.getcwd()}\\tmp\\')
-        base = os.path.basename(destination)
-        archive_from = os.path.dirname(source)
-        archive_to = os.path.basename(source.strip(os.sep))
-        shutil.make_archive(base, 'zip', archive_from, archive_to)
-        shutil.move('%s.%s' % (base, 'zip'), destination)
-        
-    make_archive(folder_location, f'{os.getcwd()}\\tmp\\{os.path.basename(folder_location)}.zip')
-
-    with pysftp.Connection('gudx.dev', username='groundedsaves', password='2xyWsgV2tat&iZj3') as sftp:
-        with sftp.cd('/var/www/gudx.dev/downloads/Grounded/'):
-            sftp.put(f'{os.getcwd()}\\tmp\\{os.path.basename(folder_location)}.zip')
-            toaster.show_toast("Guu File Sync", "Save has been uploaded.", icon_path=None, duration=10)
-            while toaster.notification_active(): time.sleep(0.1)
