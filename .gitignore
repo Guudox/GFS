@@ -4,3 +4,5 @@
 *.spec
 /tmp/*
 /test/*
+config.ini
+icon.ico
