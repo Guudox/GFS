@@ -5,6 +5,7 @@ import pysftp
 import pystray
 import threading
 import configparser
+import urllib.request
 from PIL import Image
 from pystray import MenuItem as item
 from win10toast import ToastNotifier
@@ -18,6 +19,12 @@ def GuuFileSync():
 
     def check_and_create_system_files():
             nonlocal folder_location
+
+            #Check version of Program
+            link = "https://dl.gudx.dev/Grounded/.control/version.guu"
+            f = urllib.request.urlopen(link)
+            print(f.read().decode('utf-8'))
+
             if not os.path.isdir(f'{os.getcwd()}\\tmp\\'):
                 os.mkdir(f'{os.getcwd()}\\tmp\\')
             if not os.path.isfile(f'{os.getcwd()}\\icon.ico'):
