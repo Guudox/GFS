@@ -4,7 +4,7 @@ import base64
 import pysftp
 import threading
 from win10toast import ToastNotifier
-from tkinter import DISABLED, END, INSERT, NORMAL, filedialog, Button, Text, Frame, Tk
+from tkinter import DISABLED, END, INSERT, NORMAL, Label, filedialog, Button, Text, Frame, Tk
 
 def GuuFileSync():
     ##The Base64 icon version as a string
@@ -29,7 +29,7 @@ def GuuFileSync():
     #Create Window
     window = Tk()
     window.title('Guu File Sync')
-    window.geometry('400x100')
+    window.geometry('400x150')
     window.iconbitmap(tempFile)
 
     #Create Frame data for Save File
@@ -39,17 +39,19 @@ def GuuFileSync():
     upload_download_location = Frame(window)
     upload_download_location.pack()
 
-    def browsefunc():
+    def browsefunc(func):
         nonlocal folder_location
-        load_path_text.config(state=NORMAL)
-        load_path_text.delete(1.0, END)
+        func.config(state=NORMAL)
+        func.delete(1.0, END)
         folder_location = filedialog.askdirectory()
-        load_path_text.insert(1.0, folder_location)
-        load_path_text.see(INSERT)
-        load_path_text.config(state=DISABLED)
+        func.insert(1.0, folder_location)
+        func.see(INSERT)
+        func.config(state=DISABLED)
 
     def sftp_util(state):
-        with pysftp.Connection('gudx.dev', username='groundedsaves', password='2xyWsgV2tat&iZj3') as sftp:
+        cnopts = pysftp.CnOpts()
+        cnopts.hostkeys = None
+        with pysftp.Connection('gudx.dev', username='groundedsaves', password='2xyWsgV2tat&iZj3', cnopts=cnopts) as sftp:
             if state == 'upload':
                 sftp.chdir('saves')
                 sftp.put(f'{os.getcwd()}\\tmp\\latest.zip')
@@ -58,36 +60,54 @@ def GuuFileSync():
                 sftp.close()
                 toaster.show_toast("Guu File Sync", "Save has been uploaded.", icon_path=None, duration=10)
             elif state == 'download':
-                file = sftp.get(f'{os.getcwd()}\\tmp\\{os.path.basename(folder_location)}.zip')
-                print(file)
-                toaster.show_toast("Guu File Sync", "Save file sync'd to local system.", icon_path=None, duration=10)
+                sftp.chdir('saves')
+                sftp.get('latest.zip', f'{os.getcwd()}\\tmp\\latest.zip')
                 
 
     def make_archive():
         def inner_func():
             destination = f'{os.getcwd()}\\tmp\\{os.path.basename(folder_location)}.zip'
-            if not os.path.isdir(f'{os.getcwd()}\\tmp'):
+            if not os.path.isdir(f'{os.getcwd()}\\tmp\\'):
                 os.mkdir(f'{os.getcwd()}\\tmp\\')
             base = os.path.basename(destination)
             archive_from = os.path.dirname(folder_location)
             archive_to = os.path.basename(folder_location.strip(os.sep))
             shutil.make_archive(base, 'zip', archive_from, archive_to)
             shutil.move('%s.%s' % (base, 'zip'), destination)
-            shutil.copy(destination, f'{os.getcwd()}/tmp/latest.zip')
+            shutil.copy(destination, f'{os.getcwd()}\\tmp\\latest.zip')
             sftp_util('upload')
         threading.Thread(target=inner_func).start()
         
+    def download_archive():
+        def inner_func():
+            sftp_util('download')
+            shutil.unpack_archive(f'{os.getcwd()}\\tmp\\latest.zip', f'{os.getcwd()}\\test\\')
+            toaster.show_toast("Guu File Sync", "Save file sync'd to local system.", icon_path=None, duration=10)
+        
+        threading.Thread(target=inner_func).start()
 
-    load_path_text = Text(load_save_location, wrap="none",height=1, width=30, state=DISABLED)
+
+    Label(load_save_location, text='Save Folder').place(x=6, y=5)
+    load_path_text = Text(load_save_location, wrap="none",height=1, width=30)
+    load_path_text.insert(1.0, '<Folder (ID-GAMENUMBER)(LOGOUT-SAVE)>')
+    load_path_text.config(state=DISABLED)
     load_path_text.grid(row=0, column=0, padx=window_padX, pady=window_padY)
-    browsefolderbutton = Button(load_save_location, text="Browse", command=browsefunc)
+    browsefolderbutton = Button(load_save_location, text="Browse", command=lambda: browsefunc(load_path_text))
     browsefolderbutton.grid(row=0, column=1, padx=window_padX, pady=window_padY)
 
-    upload = Button(upload_download_location, text="Upload", command=make_archive)
-    upload.grid(row=1, column=0, padx=window_padX)
+    Label(load_save_location, text='Game Save Location').place(x=6, y=50)
+    game_path_text = Text(load_save_location, wrap="none",height=1, width=30)
+    game_path_text.insert(1.0, 'C:\\Users\\<Your User>\\Saved Games\\Grounded')
+    game_path_text.config(state=DISABLED)
+    game_path_text.grid(row=1, column=0, padx=window_padX)
+    browsefolderbutton = Button(load_save_location, text="Browse", command=lambda: browsefunc(game_path_text))
+    browsefolderbutton.grid(row=1, column=1, padx=window_padX)
 
-    download = Button(upload_download_location, text="Download", command=browsefunc)
-    download.grid(row=1, column=1, padx=window_padX)
+    upload = Button(upload_download_location, text="Upload", command=make_archive)
+    upload.grid(row=2, column=0, padx=window_padX, pady=window_padY)
+
+    download = Button(upload_download_location, text="Download", command=download_archive)
+    download.grid(row=2, column=1, padx=window_padX, pady=window_padY)
 
     window.resizable(False, False)
     window.mainloop()
