@@ -1,4 +1,5 @@
 import os
+from re import T
 import time
 import shutil
 import base64
@@ -6,13 +7,11 @@ import pysftp
 import pystray
 import threading
 import configparser
-import urllib.request
 from PIL import Image
-from client import Client
 from pystray import MenuItem as item
 from win10toast import ToastNotifier
-from check_process import check_if_game_is_running
-from tkinter import DISABLED, END, INSERT, NORMAL, Label, filedialog, Button, Text, Frame, Tk
+from check_process import check_if_game_is_running, check_for_new_save
+from tkinter import DISABLED, END, INSERT, NORMAL, Entry, Label, Menu, Toplevel, filedialog, Button, Text, Frame, Tk
 
 def GuuFileSync():
     config = configparser.ConfigParser()
@@ -22,12 +21,6 @@ def GuuFileSync():
     guu_version = '1.0.2'
     def check_and_create_system_files():
             nonlocal folder_location
-
-            #Check version of Program
-            link = "https://dl.gudx.dev/Grounded/.control/version.guu"
-            f = urllib.request.urlopen(link)
-            print(f.read().decode('utf-8'))
-
             if not os.path.isdir(f'{os.getcwd()}\\tmp\\'):
                 os.mkdir(f'{os.getcwd()}\\tmp\\')
             if not os.path.isfile(f'{os.getcwd()}\\icon.ico'):
@@ -44,8 +37,13 @@ def GuuFileSync():
 
             if not os.path.isfile(f'{os.getcwd()}\\config.ini'):
                 config.add_section('SYSTEM')
+                config.add_section('TRACKER')
                 config['SYSTEM']['base_save'] = 'C:\\Users\\<Your User>\\Saved Games\\Grounded'
                 config['SYSTEM']['save_folder'] = '(ID-GAMENUMBER)(LOGOUT-SAVE)'
+                config['SYSTEM']['user_name'] = 'None'
+                config['TRACKER']['last_save'] = 'None'
+                config['TRACKER']['last_user'] = 'None'
+                config['TRACKER']['version'] = guu_version
                 with open('config.ini', 'w') as configfile:
                     config.write(configfile)
                 config.read(f'{os.getcwd()}\\config.ini')
@@ -99,13 +97,20 @@ def GuuFileSync():
                 sftp.put(f'{os.getcwd()}\\tmp\\latest.zip')
                 sftp.chdir('backup')
                 sftp.put(f'{os.getcwd()}\\tmp\\{config["SYSTEM"]["save_folder"]}.zip')
+                sftp.chdir('../../.control')
+                #Send who uploaded the file
+                with open(f'{os.getcwd()}\\tmp\\last_user.txt', 'w') as f:
+                    f.write(config['SYSTEM']['user_name'])
+                sftp.put(f'{os.getcwd()}\\tmp\\last_user.txt')
+                os.remove(f'{os.getcwd()}\\tmp\\last_user.txt')
                 sftp.close()
-                toaster.show_toast("Guu File Sync", "Save has been uploaded.", icon_path=appIcon, duration=10)
+                toaster.show_toast("Guu File Sync", "Save has been uploaded.",
+                                   icon_path=appIcon, duration=10, threaded=True)
+                upload.config(state=DISABLED)
             elif state == 'download':
                 sftp.chdir('saves')
                 sftp.get('latest.zip', f'{os.getcwd()}\\tmp\\latest.zip')
                 
-
     def make_archive():
         def inner_func():
             destination = f'{os.getcwd()}\\tmp\\{config["SYSTEM"]["save_folder"]}.zip'
@@ -116,14 +121,16 @@ def GuuFileSync():
             shutil.move('%s.%s' % (base, 'zip'), destination)
             shutil.copy(destination, f'{os.getcwd()}\\tmp\\latest.zip')
             sftp_util('upload')
-        threading.Thread(target=inner_func).start()
+        threading.Thread(target=inner_func, daemon=True).start()
         
     def download_archive():
         def inner_func():
             sftp_util('download')
             shutil.unpack_archive(f'{os.getcwd()}\\tmp\\latest.zip', config['SYSTEM']['base_save'])
-            toaster.show_toast("Guu File Sync", "Save file sync'd to local system.", icon_path=appIcon, duration=10)
-        threading.Thread(target=inner_func).start()
+            toaster.show_toast("Guu File Sync", "Save file sync'd to local system.", icon_path=appIcon, duration=10, threaded=True)
+            download.config(state=DISABLED)
+            upload.config(state=NORMAL)
+        threading.Thread(target=inner_func, daemon=True).start()
     
     Label(load_save_location, text='Save Folder').place(x=6, y=5)
     load_path_text = Text(load_save_location, wrap="none", height=1, width=50)
@@ -139,39 +146,68 @@ def GuuFileSync():
     game_path_text.config(state=DISABLED)
     game_path_text.grid(row=1, column=0, padx=window_padX)
 
-    upload = Button(upload_download_location, text="Upload", command=make_archive)
+
+    upload = Button(upload_download_location, text="Upload", command=make_archive, state=DISABLED)
     upload.grid(row=2, column=0, padx=window_padX, pady=window_padY)
 
-    download = Button(upload_download_location, text="Download", command=download_archive)
+    download = Button(upload_download_location, text="Download",
+                      command=download_archive, state=DISABLED)
     download.grid(row=2, column=1, padx=window_padX, pady=window_padY)
 
     Label(window, text=f'Version: {guu_version}').place(x=410, y=125)
 
-    def quit_window(icon):
-        icon.stop()
+    def setup_username():
+        def setupname():
+            config['SYSTEM']['user_name'] = entry.get()
+            with open('config.ini', 'w') as configfile:
+                config.write(configfile)
+            upload.config(state=NORMAL)
+            usernamewin.destroy()
+        usernamewin = Toplevel(window)
+        usernamewin.geometry("100x50")
+        usernamewin.resizable(False, False)
+        entry = Entry(usernamewin, width=15, textvariable=config['SYSTEM']['user_name'])
+        entry.pack()
+        submit = Button(usernamewin, text="Submit", command=setupname)
+        submit.pack()
+
+    menubar = Menu(window)
+    optionmenu = Menu(menubar, tearoff=0)
+    optionmenu.add_command(label="Set Username", command=setup_username)
+    menubar.add_cascade(label="Options", menu=optionmenu)
+
+    def quit_window(tray):
+        tray.stop()
         window.destroy()
 
     # Define a function to show the window again
-    def show_window(icon):
-        icon.stop()
+    def show_window(tray):
+        tray.stop()
         window.after(0, window.deiconify)
 
     # Hide the window and show on the system taskbar
     def hide_window():
         nonlocal appIcon
         window.withdraw()
-        image = Image.open(appIcon)
-        menu = (item('Show', show_window),item('Upload', make_archive), item('Download', download_archive), item('Quit', quit_window))
-        icon = pystray.Icon("GFS", image, "Guu File Sync", menu)
-        icon.run()
-
-    # def process_corotine():
-    #     while True:
-    #         check_if_game_is_running('discord') #'Maine-Win64-Shipping'
-    #         time.sleep(5)
-    # threading.Thread(target=process_corotine).start()
+        menu = (item('Show', show_window), item('Upload', make_archive), item(
+            'Download', download_archive), item('Quit', quit_window))
+        tray = pystray.Icon("GFS", Image.open(appIcon), "Guu File Sync", menu)
+        tray.run()
 
     window.protocol('WM_DELETE_WINDOW', hide_window)
 
+    def process_corotine():
+        while True:
+            check_if_game_is_running('code') #'Maine-Win64-Shipping'
+            if check_for_new_save():
+                toaster.show_toast("Guu File Sync", "A new save is ready for download.", icon_path=appIcon, duration=5)
+                download.config(state=NORMAL)
+            else:
+                if config['SYSTEM']['user_name'] != None:
+                    upload.config(state=NORMAL)
+            time.sleep(10)
+    threading.Thread(target=process_corotine, daemon=True).start()
+    
+    window.config(menu=menubar)
     window.resizable(False, False)
     window.mainloop()

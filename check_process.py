@@ -1,5 +1,10 @@
-import psutil
+import os
 import time
+import psutil
+import configparser
+import urllib.request
+
+config = configparser.ConfigParser()
 
 def findProcessIdByName(processName):
     '''
@@ -28,3 +33,27 @@ def check_if_game_is_running(process: str):
         return True
     else :
        return False
+
+def check_for_new_save():
+    config.read(f'{os.getcwd()}\\config.ini')
+    link = "https://dl.gudx.dev/Grounded/saves/latest.zip"
+    lastuser = "https://dl.gudx.dev/Grounded/.control/last_user.txt"
+    f = urllib.request.urlopen(link)
+    user = urllib.request.urlopen(lastuser)
+    last_user_in_stack = None
+    for line in user:
+        last_user_in_stack = line.decode("utf-8")
+    last_modified = f.headers['last-modified']
+    if last_modified != config['TRACKER']['last_save'] and last_user_in_stack != config['TRACKER']['last_user']:
+        config['TRACKER']['last_save'] = last_modified
+        config['TRACKER']['last_user'] = last_user_in_stack
+        with open('config.ini', 'w') as configfile:
+                config.write(configfile)
+        return True
+    else:
+        return False
+    
+def check_for_new_version():
+    link = "https://dl.gudx.dev/Grounded/.control/version.guu"
+    f = urllib.request.urlopen(link)
+    print(f.read().decode('utf-8'))
