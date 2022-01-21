@@ -1,4 +1,5 @@
 import os
+import time
 import shutil
 import base64
 import pysftp
@@ -7,8 +8,10 @@ import threading
 import configparser
 import urllib.request
 from PIL import Image
+from client import Client
 from pystray import MenuItem as item
 from win10toast import ToastNotifier
+from check_process import check_if_game_is_running
 from tkinter import DISABLED, END, INSERT, NORMAL, Label, filedialog, Button, Text, Frame, Tk
 
 def GuuFileSync():
@@ -16,7 +19,7 @@ def GuuFileSync():
     folder_location = None
     appIcon = f'{os.getcwd()}\\icon.ico'
     toaster = ToastNotifier()
-
+    guu_version = '1.0.2'
     def check_and_create_system_files():
             nonlocal folder_location
 
@@ -64,9 +67,10 @@ def GuuFileSync():
     #Create Frame data for Save File
     load_save_location = Frame(window)
     load_save_location.pack()
-
     upload_download_location = Frame(window)
     upload_download_location.pack()
+    footer_location = Frame(window)
+    footer_location.pack()
 
     def browsefunc():
         nonlocal folder_location
@@ -119,7 +123,6 @@ def GuuFileSync():
             sftp_util('download')
             shutil.unpack_archive(f'{os.getcwd()}\\tmp\\latest.zip', config['SYSTEM']['base_save'])
             toaster.show_toast("Guu File Sync", "Save file sync'd to local system.", icon_path=appIcon, duration=10)
-        
         threading.Thread(target=inner_func).start()
     
     Label(load_save_location, text='Save Folder').place(x=6, y=5)
@@ -142,6 +145,8 @@ def GuuFileSync():
     download = Button(upload_download_location, text="Download", command=download_archive)
     download.grid(row=2, column=1, padx=window_padX, pady=window_padY)
 
+    Label(window, text=f'Version: {guu_version}').place(x=410, y=125)
+
     def quit_window(icon):
         icon.stop()
         window.destroy()
@@ -156,9 +161,15 @@ def GuuFileSync():
         nonlocal appIcon
         window.withdraw()
         image = Image.open(appIcon)
-        menu = (item('Show', show_window), item('Quit', quit_window))
+        menu = (item('Show', show_window),item('Upload', make_archive), item('Download', download_archive), item('Quit', quit_window))
         icon = pystray.Icon("GFS", image, "Guu File Sync", menu)
         icon.run()
+
+    # def process_corotine():
+    #     while True:
+    #         check_if_game_is_running('discord') #'Maine-Win64-Shipping'
+    #         time.sleep(5)
+    # threading.Thread(target=process_corotine).start()
 
     window.protocol('WM_DELETE_WINDOW', hide_window)
 

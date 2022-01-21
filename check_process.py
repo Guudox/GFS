@@ -21,9 +21,10 @@ def findProcessIdByName(processName):
 def check_if_game_is_running(process: str):
     listOfProcessIds = findProcessIdByName(process)
     if len(listOfProcessIds) > 0:
-       for elem in listOfProcessIds:
+        for elem in listOfProcessIds:
             processName = elem['name']
             processCreationTime =  time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(elem['create_time']))
-            print(processName, processCreationTime)
+            # print(processName, processCreationTime)
+        return True
     else :
-       print('Process is not running')
+       return False
