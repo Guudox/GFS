@@ -5,6 +5,7 @@ import configparser
 import urllib.request
 
 config = configparser.ConfigParser()
+config_path = '%s\\.guufilesync\\' %  os.environ['LOCALAPPDATA']
 
 def findProcessIdByName(processName):
     '''
@@ -35,7 +36,7 @@ def check_if_game_is_running(process: str):
        return False
 
 def check_for_new_save():
-    config.read(f'{os.getcwd()}\\config.ini')
+    config.read(f'{config_path}\\config.ini')
     link = "https://dl.gudx.dev/Grounded/saves/latest.zip"
     lastuser = "https://dl.gudx.dev/Grounded/.control/last_user.txt"
     f = urllib.request.urlopen(link)
@@ -44,7 +45,7 @@ def check_for_new_save():
     for line in user:
         last_user_in_stack = line.decode("utf-8")
     last_modified = f.headers['last-modified']
-    if last_modified != config['TRACKER']['last_save'] and last_user_in_stack != config['TRACKER']['last_user']:
+    if last_modified != config['TRACKER']['last_save'] and last_user_in_stack != config['TRACKER']['last_user'] and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
         config['TRACKER']['last_save'] = last_modified
         config['TRACKER']['last_user'] = last_user_in_stack
         with open('config.ini', 'w') as configfile:
