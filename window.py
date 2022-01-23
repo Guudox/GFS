@@ -9,14 +9,14 @@ import configparser
 from PIL import Image
 from pystray import MenuItem as item
 from win10toast import ToastNotifier
-from check_process import check_if_game_is_running, check_for_new_save
+from check_process import check_for_new_version, check_if_game_is_running, check_for_new_save
 from tkinter import DISABLED, END, INSERT, NORMAL, Entry, Label, Menu, Toplevel, filedialog, Button, Text, Frame, Tk
 
 def GuuFileSync():
     config = configparser.ConfigParser()
     config_path = '%s\\.guufilesync\\' %  os.environ['LOCALAPPDATA']
     toaster = ToastNotifier()
-    guu_version = '1.0.2'
+    guu_version = '1.0.1'
     
     def check_and_create_system_files():
             nonlocal folder_location
@@ -35,16 +35,16 @@ def GuuFileSync():
                 iconfile = open(f'{config_path}\\icon.ico', 'wb')
                 iconfile.write(icondata)
                 iconfile.close()
-
             if not os.path.isfile(f'{config_path}\\config.ini'):
                 config.add_section('SYSTEM')
                 config.add_section('TRACKER')
-                config['SYSTEM']['base_save'] = 'C:\\Users\\<Your User>\\Saved Games\\Grounded'
+                config['SYSTEM']['base_save'] = f'{os.path.expanduser("~")}\\Saved Games\\Grounded'
                 config['SYSTEM']['save_folder'] = '(ID-GAMENUMBER)(LOGOUT-SAVE)'
                 config['SYSTEM']['user_name'] = 'None'
                 config['TRACKER']['last_save'] = 'None'
                 config['TRACKER']['last_user'] = 'None'
                 config['TRACKER']['version'] = guu_version
+                config['TRACKER']['firstuse'] = 'true'
                 with open(f'{config_path}\\config.ini', 'w') as configfile:
                     config.write(configfile)
                 config.read(f'{config_path}\\config.ini')
@@ -52,6 +52,10 @@ def GuuFileSync():
                 config.read(f'{config_path}\\config.ini')
                 folder_location = f'{config["SYSTEM"]["base_save"]}\\{config["SYSTEM"]["save_folder"]}'
 
+            if config['TRACKER']['version'] != guu_version:
+                config['TRACKER']['version'] = guu_version
+                with open(f'{config_path}\\config.ini', 'w') as configfile:
+                    config.write(configfile)
     check_and_create_system_files()
 
     folder_location = None
@@ -77,18 +81,12 @@ def GuuFileSync():
     def browsefunc():
         nonlocal folder_location
         load_path_text.config(state=NORMAL)
-        game_path_text.config(state=NORMAL)
         load_path_text.delete(1.0, END)
-        game_path_text.delete(1.0, END)
-        folder_location = filedialog.askdirectory()
+        folder_location = filedialog.askdirectory(initialdir=config['SYSTEM']['base_save'])
         load_path_text.insert(1.0, os.path.basename(folder_location))
-        game_path_text.insert(1.0, os.path.dirname(folder_location))
         config['SYSTEM']['save_folder'] = os.path.basename(folder_location)
-        config['SYSTEM']['base_save'] = os.path.dirname(folder_location)
         load_path_text.see(INSERT)
-        game_path_text.see(INSERT)
         load_path_text.config(state=DISABLED)
-        game_path_text.config(state=DISABLED)
         with open('config.ini', 'w') as configfile:
             config.write(configfile)
 
@@ -114,7 +112,8 @@ def GuuFileSync():
             elif state == 'download':
                 sftp.chdir('saves')
                 sftp.get('latest.zip', f'{config_path}\\tmp\\latest.zip')
-                
+        config['TRACKER']['firstuse'] = 'false'
+
     def make_archive():
         def inner_func():
             destination = f'{config_path}\\tmp\\{config["SYSTEM"]["save_folder"]}.zip'
@@ -150,12 +149,10 @@ def GuuFileSync():
     game_path_text.config(state=DISABLED)
     game_path_text.grid(row=1, column=0, padx=window_padX)
 
-
     upload = Button(upload_download_location, text="Upload", command=make_archive, state=DISABLED)
     upload.grid(row=2, column=0, padx=window_padX, pady=window_padY)
 
-    download = Button(upload_download_location, text="Download",
-                      command=download_archive, state=DISABLED)
+    download = Button(upload_download_location, text="Download", command=download_archive, state=DISABLED)
     download.grid(row=2, column=1, padx=window_padX, pady=window_padY)
 
     Label(window, text=f'Version: {guu_version}').place(x=410, y=125)
@@ -165,6 +162,8 @@ def GuuFileSync():
             config['SYSTEM']['user_name'] = entry.get()
             with open(f'{config_path}\\config.ini', 'w') as configfile:
                 config.write(configfile)
+            optionmenu.delete("Set Username")
+            optionmenu.add_command(label="Reset", command=factory_reset)
             usernamewin.destroy()
         usernamewin = Toplevel(window)
         usernamewin.geometry("100x50")
@@ -174,9 +173,33 @@ def GuuFileSync():
         submit = Button(usernamewin, text="Submit", command=setupname)
         submit.pack()
 
+    def factory_reset():
+        config['SYSTEM']['base_save'] = f'{os.path.expanduser("~")}\\Saved Games\\Grounded'
+        config['SYSTEM']['save_folder'] = '(ID-GAMENUMBER)(LOGOUT-SAVE)'
+        config['SYSTEM']['user_name'] = 'None'
+        config['TRACKER']['last_save'] = 'None'
+        config['TRACKER']['last_user'] = 'None'
+        config['TRACKER']['version'] = guu_version
+        config['TRACKER']['firstuse'] = 'true'
+        with open(f'{config_path}\\config.ini', 'w') as configfile:
+            config.write(configfile)
+        optionmenu.delete("Reset")
+        optionmenu.add_command(label="Set Username", command=setup_username)
+        load_path_text.config(state=NORMAL)
+        load_path_text.delete(1.0, END)
+        load_path_text.insert(1.0, config['SYSTEM']['save_folder'])
+        load_path_text.config(state=DISABLED)
+        upload.config(state=DISABLED)
+        
+    def update_gfs():
+        optionmenu.delete("Update")
+
     menubar = Menu(window)
     optionmenu = Menu(menubar, tearoff=0)
-    optionmenu.add_command(label="Set Username", command=setup_username)
+    if config.getboolean('TRACKER', 'firstuse'):
+        optionmenu.add_command(label="Set Username", command=setup_username)
+    else:
+        optionmenu.add_command(label="Reset", command=factory_reset)
     menubar.add_cascade(label="Options", menu=optionmenu)
 
     def quit_window(tray):
@@ -200,18 +223,32 @@ def GuuFileSync():
     window.protocol('WM_DELETE_WINDOW', hide_window)
 
     def process_corotine():
-        showOnce = True
+        showOnceSave = True
+        showOnceVersion = True
         while True:                
             check_if_game_is_running('code') #'Maine-Win64-Shipping'
-            if check_for_new_save():
-                if showOnce:
-                    toaster.show_toast("Guu File Sync", "A new save is ready for download.", icon_path=appIcon, duration=5)
-                    download.config(state=NORMAL)
-                    showOnce = False
-            else:
+            if config.getboolean('TRACKER', 'firstuse'):
+                download.config(state=NORMAL)
                 if config['SYSTEM']['user_name'] != 'None' and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
                     upload.config(state=NORMAL)
-                    showOnce = True
+            else:
+                if check_for_new_save():
+                    if showOnceSave:
+                        toaster.show_toast("Guu File Sync", "A new save is ready for download.", icon_path=appIcon, duration=5)
+                        download.config(state=NORMAL)
+                        showOnceSave = False
+                else:
+                    if config['SYSTEM']['user_name'] != 'None' and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
+                        upload.config(state=NORMAL)
+                        showOnceSave = True
+            if check_for_new_version():
+                if showOnceVersion:
+                    toaster.show_toast("Guu File Sync", "A new version of GFS is available.", icon_path=appIcon, duration=5)
+                    optionmenu.add_command(label="Update", command=update_gfs)
+                    showOnceVersion = False
+            else:
+               showOnceVersion = True 
+            
             time.sleep(10)
     threading.Thread(target=process_corotine, daemon=True).start()
     

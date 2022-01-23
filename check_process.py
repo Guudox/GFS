@@ -55,6 +55,13 @@ def check_for_new_save():
         return False
     
 def check_for_new_version():
+    config.read(f'{config_path}\\config.ini')
     link = "https://dl.gudx.dev/Grounded/.control/version.guu"
-    f = urllib.request.urlopen(link)
-    print(f.read().decode('utf-8'))
+    version_control = urllib.request.urlopen(link)
+    version_master = None
+    for line in version_control:
+        version_master = line.decode("utf-8")
+        print(f'Local: {config["TRACKER"]["version"]} | Master: {version_master}')
+    if config['TRACKER']['version'] < version_master:
+        return True
+    return False
