@@ -10,13 +10,13 @@ from PIL import Image
 from pystray import MenuItem as item
 from win10toast import ToastNotifier
 from check_process import check_for_new_version, check_if_game_is_running, check_for_new_save
-from tkinter import DISABLED, END, INSERT, NORMAL, Entry, Label, Menu, Toplevel, filedialog, Button, Text, Frame, Tk
+from tkinter import DISABLED, END, INSERT, NORMAL, Entry, Label, Menu, StringVar, Toplevel, filedialog, Button, Text, Frame, Tk
 
 def GuuFileSync():
     config = configparser.ConfigParser()
     config_path = '%s\\.guufilesync\\' %  os.environ['LOCALAPPDATA']
     toaster = ToastNotifier()
-    guu_version = '1.0.1'
+    guu_version = '1.0.3'
     folder_location = None
     
     def check_and_create_system_files():
@@ -130,9 +130,11 @@ def GuuFileSync():
         def inner_func():
             sftp_util('download')
             shutil.unpack_archive(f'{config_path}\\tmp\\latest.zip', config['SYSTEM']['base_save'])
+            check_for_new_save()
             toaster.show_toast("Guu File Sync", "Save file sync'd to local system.", icon_path=appIcon, duration=10, threaded=True)
             download.config(state=DISABLED)
-            upload.config(state=NORMAL)
+            if config['SYSTEM']['user_name'] != 'None' and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
+                upload.config(state=NORMAL)
         threading.Thread(target=inner_func, daemon=True).start()
     
     Label(load_save_location, text='Save Folder').place(x=6, y=5)
@@ -163,16 +165,36 @@ def GuuFileSync():
             config['TRACKER']['firstuse'] = 'false'
             with open(f'{config_path}\\config.ini', 'w') as configfile:
                 config.write(configfile)
-            optionmenu.delete("Set Username")
-            optionmenu.add_command(label="Reset", command=factory_reset)
             usernamewin.destroy()
+        def check_name_length(*_):
+            if len(username.get()) >= 3:
+                submit.config(state=NORMAL)
+            else:
+                submit.config(state=DISABLED)
         usernamewin = Toplevel(window)
-        usernamewin.geometry("100x50")
+        usernamewin.geometry("250x100")
         usernamewin.resizable(False, False)
-        entry = Entry(usernamewin, width=15, textvariable=config['SYSTEM']['user_name'])
-        entry.pack()
-        submit = Button(usernamewin, text="Submit", command=setupname)
-        submit.pack()
+
+        title_frame = Frame(usernamewin)
+        title_frame.pack()
+        username_frame = Frame(usernamewin) 
+        username_frame.pack()
+        button_frame = Frame(usernamewin) 
+        button_frame.pack()
+
+        first_time = Label(title_frame, text='First time setup')
+        if config.getboolean('TRACKER', 'firstuse'):
+            first_time.grid(row=0, column=0, padx=80)
+        else:
+            usernamewin.geometry("250x75")
+            first_time.grid_forget()
+        Label(username_frame, text='Username:').grid(row=1, column=0, sticky='w')
+        username = StringVar()
+        entry = Entry(username_frame, width=15, textvariable=username)
+        entry.grid(row=1, column=1, sticky='w')
+        username.trace_add('write', check_name_length)
+        submit = Button(button_frame, text="Submit", command=setupname, state=DISABLED)
+        submit.grid(row=2, padx=80, pady=20)
 
     def factory_reset():
         config['SYSTEM']['base_save'] = f'{os.path.expanduser("~")}\\Saved Games\\Grounded'
@@ -196,12 +218,12 @@ def GuuFileSync():
         optionmenu.delete("Update")
         os.startfile('C:\\Program Files\\Notepad++\\notepad++.exe')
 
+    if config.getboolean('TRACKER', 'firstuse'):
+        setup_username()
     menubar = Menu(window)
     optionmenu = Menu(menubar, tearoff=0)
-    if config.getboolean('TRACKER', 'firstuse'):
-        optionmenu.add_command(label="Set Username", command=setup_username)
-    else:
-        optionmenu.add_command(label="Reset", command=factory_reset)
+    optionmenu.add_command(label="Change Username", command=setup_username)
+    optionmenu.add_command(label="Reset", command=factory_reset)
     menubar.add_cascade(label="Options", menu=optionmenu)
 
     def quit_window(tray):
@@ -227,7 +249,7 @@ def GuuFileSync():
     def process_corotine():
         showOnceSave = True
         showOnceVersion = True
-        process_name = 'notepad++' #'Maine-Win64-Shipping'
+        process_name = 'Maine-Win64-Shipping' #'Maine-Win64-Shipping'
         game_running = Label(window, text='Game running...')
         while True:
             if check_if_game_is_running(process_name):
@@ -237,9 +259,8 @@ def GuuFileSync():
             else:
                 game_running.place_forget()
                 if config.getboolean('TRACKER', 'firstuse'):
-                    download.config(state=NORMAL)
-                    if config['SYSTEM']['user_name'] != 'None' and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
-                        upload.config(state=NORMAL)
+                    if config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)': download.config(state=NORMAL)
+                    if config['SYSTEM']['user_name'] != 'None' and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)': upload.config(state=NORMAL)
                 else:
                     if check_for_new_save():
                         if showOnceSave:
@@ -248,6 +269,7 @@ def GuuFileSync():
                             showOnceSave = False
                     else:
                         if config['SYSTEM']['user_name'] != 'None' and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
+                            download.config(state=NORMAL)
                             upload.config(state=NORMAL)
                             showOnceSave = True
                 if check_for_new_version():

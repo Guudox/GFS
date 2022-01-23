@@ -45,7 +45,7 @@ def check_for_new_save():
     for line in user:
         last_user_in_stack = line.decode("utf-8")
     last_modified = f.headers['last-modified']
-    if last_modified != config['TRACKER']['last_save'] and last_user_in_stack != config['TRACKER']['last_user'] and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
+    if last_modified != config['TRACKER']['last_save'] and last_user_in_stack != config['SYSTEM']['user_name'] and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
         config['TRACKER']['last_save'] = last_modified
         config['TRACKER']['last_user'] = last_user_in_stack
         with open(f'{config_path}\\config.ini', 'w') as configfile:
