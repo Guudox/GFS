@@ -6,6 +6,7 @@ import pysftp
 import pystray
 import threading
 import configparser
+import urllib.request
 from PIL import Image
 from pystray import MenuItem as item
 from win10toast import ToastNotifier
@@ -16,7 +17,7 @@ def GuuFileSync():
     config = configparser.ConfigParser()
     config_path = '%s\\.guufilesync\\' %  os.environ['LOCALAPPDATA']
     toaster = ToastNotifier()
-    guu_version = '1.0.3'
+    guu_version = '1.0.1'
     folder_location = None
     
     def check_and_create_system_files():
@@ -25,6 +26,8 @@ def GuuFileSync():
                 os.makedirs(config_path)
             if not os.path.isdir(f'{config_path}\\tmp\\'):
                 os.mkdir(f'{config_path}\\tmp\\')
+            if not os.path.isfile(f'{config_path}\\updater.exe'):
+                urllib.request.urlretrieve('https://dl.gudx.dev/Grounded/.control/updater.exe', f'{config_path}\\updater.exe')
             if not os.path.isfile(f'{config_path}\\icon.ico'):
                 ##The Base64 icon version as a string
                 ## Create Icon from Base64 Data
@@ -46,6 +49,7 @@ def GuuFileSync():
                 config['TRACKER']['last_user'] = 'None'
                 config['TRACKER']['version'] = guu_version
                 config['TRACKER']['firstuse'] = 'true'
+                config['TRACKER']['exe_location'] = os.getcwd()
                 with open(f'{config_path}\\config.ini', 'w') as configfile:
                     config.write(configfile)
                 config.read(f'{config_path}\\config.ini')
@@ -57,6 +61,12 @@ def GuuFileSync():
                 config['TRACKER']['version'] = guu_version
                 with open(f'{config_path}\\config.ini', 'w') as configfile:
                     config.write(configfile)
+
+            if config['TRACKER']['exe_location'] != os.getcwd(): 
+                config['TRACKER']['exe_location'] = os.getcwd()
+                with open(f'{config_path}\\config.ini', 'w') as configfile:
+                    config.write(configfile)
+
     check_and_create_system_files()
 
     appIcon = f'{config_path}\\icon.ico'
@@ -204,10 +214,10 @@ def GuuFileSync():
         config['TRACKER']['last_user'] = 'None'
         config['TRACKER']['version'] = guu_version
         config['TRACKER']['firstuse'] = 'true'
+        config['TRACKER']['exe_location'] = os.getcwd()
         with open(f'{config_path}\\config.ini', 'w') as configfile:
             config.write(configfile)
         optionmenu.delete("Reset")
-        optionmenu.add_command(label="Set Username", command=setup_username)
         load_path_text.config(state=NORMAL)
         load_path_text.delete(1.0, END)
         load_path_text.insert(1.0, config['SYSTEM']['save_folder'])
@@ -215,8 +225,8 @@ def GuuFileSync():
         upload.config(state=DISABLED)
         
     def update_gfs():
-        optionmenu.delete("Update")
-        os.startfile('C:\\Program Files\\Notepad++\\notepad++.exe')
+        window.destroy()
+        os.startfile(f"{config_path}\\updater.exe")
 
     if config.getboolean('TRACKER', 'firstuse'):
         setup_username()
