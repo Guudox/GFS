@@ -17,6 +17,7 @@ def GuuFileSync():
     config_path = '%s\\.guufilesync\\' %  os.environ['LOCALAPPDATA']
     toaster = ToastNotifier()
     guu_version = '1.0.1'
+    folder_location = None
     
     def check_and_create_system_files():
             nonlocal folder_location
@@ -58,7 +59,6 @@ def GuuFileSync():
                     config.write(configfile)
     check_and_create_system_files()
 
-    folder_location = None
     appIcon = f'{config_path}\\icon.ico'
     
     window_padX = 10
@@ -87,7 +87,7 @@ def GuuFileSync():
         config['SYSTEM']['save_folder'] = os.path.basename(folder_location)
         load_path_text.see(INSERT)
         load_path_text.config(state=DISABLED)
-        with open('config.ini', 'w') as configfile:
+        with open(f'{config_path}\\config.ini', 'w') as configfile:
             config.write(configfile)
 
     def sftp_util(state):
@@ -112,7 +112,7 @@ def GuuFileSync():
             elif state == 'download':
                 sftp.chdir('saves')
                 sftp.get('latest.zip', f'{config_path}\\tmp\\latest.zip')
-        config['TRACKER']['firstuse'] = 'false'
+        
 
     def make_archive():
         def inner_func():
@@ -160,6 +160,7 @@ def GuuFileSync():
     def setup_username():
         def setupname():
             config['SYSTEM']['user_name'] = entry.get()
+            config['TRACKER']['firstuse'] = 'false'
             with open(f'{config_path}\\config.ini', 'w') as configfile:
                 config.write(configfile)
             optionmenu.delete("Set Username")
@@ -193,6 +194,7 @@ def GuuFileSync():
         
     def update_gfs():
         optionmenu.delete("Update")
+        os.startfile('C:\\Program Files\\Notepad++\\notepad++.exe')
 
     menubar = Menu(window)
     optionmenu = Menu(menubar, tearoff=0)
@@ -225,31 +227,38 @@ def GuuFileSync():
     def process_corotine():
         showOnceSave = True
         showOnceVersion = True
-        while True:                
-            check_if_game_is_running('code') #'Maine-Win64-Shipping'
-            if config.getboolean('TRACKER', 'firstuse'):
-                download.config(state=NORMAL)
-                if config['SYSTEM']['user_name'] != 'None' and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
-                    upload.config(state=NORMAL)
+        process_name = 'notepad++' #'Maine-Win64-Shipping'
+        game_running = Label(window, text='Game running...')
+        while True:
+            if check_if_game_is_running(process_name):
+                upload.config(state=DISABLED)
+                download.config(state=DISABLED)
+                game_running.place(x=405, y=110)
             else:
-                if check_for_new_save():
-                    if showOnceSave:
-                        toaster.show_toast("Guu File Sync", "A new save is ready for download.", icon_path=appIcon, duration=5)
-                        download.config(state=NORMAL)
-                        showOnceSave = False
-                else:
+                game_running.place_forget()
+                if config.getboolean('TRACKER', 'firstuse'):
+                    download.config(state=NORMAL)
                     if config['SYSTEM']['user_name'] != 'None' and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
                         upload.config(state=NORMAL)
-                        showOnceSave = True
-            if check_for_new_version():
-                if showOnceVersion:
-                    toaster.show_toast("Guu File Sync", "A new version of GFS is available.", icon_path=appIcon, duration=5)
-                    optionmenu.add_command(label="Update", command=update_gfs)
-                    showOnceVersion = False
-            else:
-               showOnceVersion = True 
+                else:
+                    if check_for_new_save():
+                        if showOnceSave:
+                            toaster.show_toast("Guu File Sync", "A new save is ready for download.", icon_path=appIcon, duration=5)
+                            download.config(state=NORMAL)
+                            showOnceSave = False
+                    else:
+                        if config['SYSTEM']['user_name'] != 'None' and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
+                            upload.config(state=NORMAL)
+                            showOnceSave = True
+                if check_for_new_version():
+                    if showOnceVersion:
+                        optionmenu.add_command(label="Update", command=update_gfs)
+                        toaster.show_toast("Guu File Sync", "A new version of GFS is available.", icon_path=appIcon, duration=5)
+                        showOnceVersion = False
+                else:
+                    showOnceVersion = True 
             
-            time.sleep(10)
+            time.sleep(5)
     threading.Thread(target=process_corotine, daemon=True).start()
     
     window.config(menu=menubar)

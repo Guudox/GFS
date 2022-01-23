@@ -48,7 +48,7 @@ def check_for_new_save():
     if last_modified != config['TRACKER']['last_save'] and last_user_in_stack != config['TRACKER']['last_user'] and config['SYSTEM']['save_folder'] != '(ID-GAMENUMBER)(LOGOUT-SAVE)':
         config['TRACKER']['last_save'] = last_modified
         config['TRACKER']['last_user'] = last_user_in_stack
-        with open('config.ini', 'w') as configfile:
+        with open(f'{config_path}\\config.ini', 'w') as configfile:
                 config.write(configfile)
         return True
     else:
@@ -61,7 +61,6 @@ def check_for_new_version():
     version_master = None
     for line in version_control:
         version_master = line.decode("utf-8")
-        print(f'Local: {config["TRACKER"]["version"]} | Master: {version_master}')
     if config['TRACKER']['version'] < version_master:
         return True
     return False
