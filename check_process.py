@@ -61,6 +61,7 @@ def check_for_new_version():
     version_master = None
     for line in version_control:
         version_master = line.decode("utf-8")
+    print(f"Local: {config['TRACKER']['version']} | Master: {version_master} | Same version: {config['TRACKER']['version'] < version_master}" )
     if config['TRACKER']['version'] < version_master:
         return True
     return False

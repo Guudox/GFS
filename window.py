@@ -282,7 +282,7 @@ def GuuFileSync():
                             download.config(state=NORMAL)
                             upload.config(state=NORMAL)
                             showOnceSave = True
-                if check_for_new_version():
+                if not check_for_new_version():
                     if showOnceVersion:
                         optionmenu.add_command(label="Update", command=update_gfs)
                         toaster.show_toast("Guu File Sync", "A new version of GFS is available.", icon_path=appIcon, duration=5)
